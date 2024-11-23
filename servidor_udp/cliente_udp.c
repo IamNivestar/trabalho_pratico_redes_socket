@@ -3,10 +3,10 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <time.h>
 
-#define FILENAME "arquivo"
 #define OUTPUT "arquivo_recebido_do_servidor"
-#define PORT 8080
+#define PORT 8081
 #define BUFFER_SIZE 1024
 
 int main(int argc, char *argv[])
@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
 
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
+    double temp_ini = clock();
     while ((bytes_received = recvfrom(socketUdp, buffer, BUFFER_SIZE, 0, NULL, NULL)) > 0)
     {
         if (bytes_received == 0)
@@ -47,9 +48,13 @@ int main(int argc, char *argv[])
     }
 
     printf("Fim...");
-
+    long tamanho_do_arquivo_gravado = ftell(arquivo);
     fclose(arquivo);
     close(socketUdp);
 
+    double temp_total = (clock() - temp_ini) / CLOCKS_PER_SEC;
+    // double taxa_download = ((tamanho_do_arquivo_gravado / temp_total) * 8) / 1000000;
+    double taxa_download = tamanho_do_arquivo_gravado / temp_total;
+    printf("\nTaxa de download: %.2f", taxa_download);
     return 0;
 }

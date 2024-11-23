@@ -4,9 +4,9 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#define PORT 8080
+#define PORT 8081
 #define BUFFER_SIZE 1024
-#define FILENAME "teste.txt"
+#define FILENAME "arquivo"
 
 int main()
 {
@@ -42,7 +42,7 @@ int main()
 
     printf("Servidor UDP aguardando mensagens na porta %d...\n", PORT);
 
-    // client_len = sizeof(client_addr);
+    client_len = sizeof(client_addr);
 
     if (recvfrom(socketUdp, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_len) < 0)
     {
@@ -55,6 +55,7 @@ int main()
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, arquivo)) > 0)
     {
+        // printf("Enviando bloco de %ld bytes...\n", bytes_read);
         if (sendto(socketUdp, buffer, bytes_read, 0, (struct sockaddr *)&client_addr, client_len) < 0)
         {
             printf("Erro ao enviar dados");
