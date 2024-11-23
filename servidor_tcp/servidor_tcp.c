@@ -7,46 +7,58 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
-#define FILE_NAME "arqurivo"
+#define FILE_NAME "arquivo"
 
 void send_file(int client_socket) {
+    
     FILE *file = fopen(FILE_NAME, "rb");
     if (!file) {
-        perror("Erro ao abrir o arquivo");
+        perror("Erro ao abrir o arquivo\n");
         exit(EXIT_FAILURE);
     }
 
-    // Obter o tamanho do arquivo
     fseek(file, 0, SEEK_END);
-    size_t file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    size_t file_size = ftell(file); //o ponteiro ta no final do arquivo depois do fseek, a posição do ftell é o tamanho do arquivo
+    fseek(file, 0, SEEK_SET); // tive q voltar o ponteiro para o inicio do arquivo pq começarei a transferir o arquivo
 
-    // Enviar o tamanho do arquivo ao cliente
     uint32_t net_file_size = htonl(file_size); // Converter para a ordem de bytes de rede
-    send(client_socket, &net_file_size, sizeof(net_file_size), 0);
+    send(client_socket, &net_file_size, sizeof(net_file_size), 0);  // enviando o tamanho do arquivo ao cliente
 
     printf("Tamanho do arquivo (%zu bytes) enviado ao cliente.\n", file_size);
 
-    // Enviar o arquivo em partes
-    char buffer[BUFFER_SIZE];
-    size_t bytes_read;
-    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        size_t bytes_sent = 0;
+    // Enviar os dados do  arquivo de forma parcionada em pacotes
+    char buffer[BUFFER_SIZE]; //criando buffer do tamanho do pacote escolhido
+    size_t bytes_read; 
+
+    size_t bytes_to_read = BUFFER_SIZE; 
+
+    while (1) {
+
+        bytes_read = fread(buffer, 1, bytes_to_read, file); //obtendo um pacote do arquivo e salvando no buffer
+
+        if (bytes_read <= 0) { 
+            break; 
+        }
+
+        size_t bytes_sent = 0; 
+
         while (bytes_sent < bytes_read) {
-            ssize_t result = send(client_socket, buffer + bytes_sent, bytes_read - bytes_sent, 0);
+            size_t bytes_remaining = bytes_read - bytes_sent; // quanto ainda ta faltando enviar
+
+            ssize_t result = send(client_socket, buffer + bytes_sent, bytes_remaining, 0); //enviar pacote
             if (result == -1) {
-                perror("Erro ao enviar dados");
+                perror("Erro ao enviar dados\n");
                 fclose(file);
                 return;
             }
-            bytes_sent += result;
+
+            bytes_sent += result; 
         }
     }
 
-    fclose(file);
 
-    // Indicar fim da transmissão
-    shutdown(client_socket, SHUT_WR);
+    fclose(file);
+    shutdown(client_socket, SHUT_WR); // avisando que a transmissao de dados acabou
     printf("Arquivo enviado com sucesso.\n");
 }
 
@@ -56,8 +68,9 @@ int main() {
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
 
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("Erro ao criar o socket");
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == 0) {
+        perror("Erro ao criar o socket\n");
         exit(EXIT_FAILURE);
     }
 
@@ -65,27 +78,35 @@ int main() {
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
 
-    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Erro ao associar o socket");
+    struct sockaddr *server_addr_ptr = (struct sockaddr *)&server_addr;
+    int bin_result = bind(server_fd, server_addr_ptr, sizeof(server_addr));
+
+    if (bin_result < 0) {
+        perror("Erro ao associar o socket\n");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
     if (listen(server_fd, 3) < 0) {
-        perror("Erro ao escutar no socket");
+        perror("Erro ao escutar no socket\n");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
     printf("Servidor escutando na porta %d...\n", PORT);
 
-    if ((client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len)) < 0) {
-        perror("Erro ao aceitar conexão");
+    client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+
+    if (client_socket < 0) {
+        perror("Erro ao aceitar conexão\n");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
+    else{  
+        printf("Cliente Conectado\n");
+    }
 
-    memset(buffer, 0, BUFFER_SIZE);
+    memset(buffer, 0, BUFFER_SIZE); 
     recv(client_socket, buffer, BUFFER_SIZE, 0);
     printf("Mensagem recebida: %s\n", buffer);
 
