@@ -14,18 +14,19 @@ int main()
 
     if (!arquivo) 
     {
-        printf("\nErro ao abrir arquivo");
+        printf("\nErro ao abrir arquivo\n");
         return 0;
     }
 
     int socketUdp;
     struct sockaddr_in server_addr, client_addr;
-    char buffer[BUFFER_SIZE];
+    char buffer[BUFFER_SIZE + sizeof(uint32_t)];
     socklen_t client_len;
+    uint32_t seq_num = 0; // Número de sequência do pacote
 
     if ((socketUdp = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
     {
-        printf("Erro ao criar socket");
+        printf("Erro ao criar socket\n");
         return 0;
     }
 
@@ -36,7 +37,7 @@ int main()
 
     if (bind(socketUdp, (const struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
-        printf("Erro ao fazer bind");
+        printf("Erro ao fazer bind\n");
         return 0;
     }
 
@@ -46,26 +47,29 @@ int main()
 
     if (recvfrom(socketUdp, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_len) < 0)
     {
-        printf("Erro ao receber mensagem");
-        // return 0;
+        printf("Erro ao receber mensagem\n");
     }
 
-    printf("Ok, recebi uma solicitacao: %s", buffer);
+    printf("Ok, recebi uma solicitação: %s\n", buffer);
     
     size_t bytes_read;
-    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, arquivo)) > 0)
+    while ((bytes_read = fread(buffer + sizeof(uint32_t), 1, BUFFER_SIZE, arquivo)) > 0)
     {
-        // printf("Enviando bloco de %ld bytes...\n", bytes_read);
-        if (sendto(socketUdp, buffer, bytes_read, 0, (struct sockaddr *)&client_addr, client_len) < 0)
+        // Adicionar número de sequência no início do pacote
+        *(uint32_t *)buffer = htonl(seq_num);
+
+        if (sendto(socketUdp, buffer, bytes_read + sizeof(uint32_t), 0, (struct sockaddr *)&client_addr, client_len) < 0)
         {
-            printf("Erro ao enviar dados");
+            printf("Erro ao enviar dados\n");
         }
+
+        seq_num++;
     }
 
     memset(buffer, 0, BUFFER_SIZE);
     if (sendto(socketUdp, buffer, 0, 0, (struct sockaddr *)&client_addr, client_len) < 0)
     {
-        printf("Erro ao enviar pacote de término");
+        printf("Erro ao enviar pacote de término\n");
     }
 
     close(socketUdp);

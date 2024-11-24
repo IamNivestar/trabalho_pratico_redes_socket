@@ -6,11 +6,10 @@
 #include <stdint.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 512
 #define FILE_NAME "arquivo"
 
 void send_file(int client_socket) {
-    
     FILE *file = fopen(FILE_NAME, "rb");
     if (!file) {
         perror("Erro ao abrir o arquivo\n");
@@ -18,47 +17,40 @@ void send_file(int client_socket) {
     }
 
     fseek(file, 0, SEEK_END);
-    size_t file_size = ftell(file); //o ponteiro ta no final do arquivo depois do fseek, a posição do ftell é o tamanho do arquivo
-    fseek(file, 0, SEEK_SET); // tive q voltar o ponteiro para o inicio do arquivo pq começarei a transferir o arquivo
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
-    uint32_t net_file_size = htonl(file_size); // Converter para a ordem de bytes de rede
-    send(client_socket, &net_file_size, sizeof(net_file_size), 0);  // enviando o tamanho do arquivo ao cliente
+    uint32_t net_file_size = htonl(file_size);
+    send(client_socket, &net_file_size, sizeof(net_file_size), 0);
 
     printf("Tamanho do arquivo (%zu bytes) enviado ao cliente.\n", file_size);
 
-    // Enviar os dados do  arquivo de forma parcionada em pacotes
-    char buffer[BUFFER_SIZE]; //criando buffer do tamanho do pacote escolhido
-    size_t bytes_read; 
+    char buffer[BUFFER_SIZE];
+    uint32_t seq_num = 0; // Número de sequência inicial
 
-    size_t bytes_to_read = BUFFER_SIZE; 
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer + sizeof(seq_num), 1, BUFFER_SIZE - sizeof(seq_num), file)) > 0) {
+        seq_num = htonl(seq_num); // Converter para ordem de rede
+        memcpy(buffer, &seq_num, sizeof(seq_num)); // Copiar o número de sequência no início do buffer
 
-    while (1) {
+        size_t bytes_to_send = bytes_read + sizeof(seq_num);
+        size_t bytes_sent = 0;
 
-        bytes_read = fread(buffer, 1, bytes_to_read, file); //obtendo um pacote do arquivo e salvando no buffer
-
-        if (bytes_read <= 0) { 
-            break; 
-        }
-
-        size_t bytes_sent = 0; 
-
-        while (bytes_sent < bytes_read) {
-            size_t bytes_remaining = bytes_read - bytes_sent; // quanto ainda ta faltando enviar
-
-            ssize_t result = send(client_socket, buffer + bytes_sent, bytes_remaining, 0); //enviar pacote
+        while (bytes_sent < bytes_to_send) {
+            ssize_t result = send(client_socket, buffer + bytes_sent, bytes_to_send - bytes_sent, 0);
             if (result == -1) {
                 perror("Erro ao enviar dados\n");
                 fclose(file);
                 return;
             }
-
-            bytes_sent += result; 
+            bytes_sent += result;
         }
+
+        seq_num = ntohl(seq_num) + 1; // Incrementar número de sequência para o próximo pacote
     }
 
-
     fclose(file);
-    shutdown(client_socket, SHUT_WR); // avisando que a transmissao de dados acabou
+    shutdown(client_socket, SHUT_WR);
     printf("Arquivo enviado com sucesso.\n");
 }
 
@@ -73,15 +65,18 @@ int main() {
         perror("Erro ao criar o socket\n");
         exit(EXIT_FAILURE);
     }
+    
+    int opt = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("Erro ao configurar SO_REUSEADDR");
+        exit(EXIT_FAILURE);
+    }
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
 
-    struct sockaddr *server_addr_ptr = (struct sockaddr *)&server_addr;
-    int bin_result = bind(server_fd, server_addr_ptr, sizeof(server_addr));
-
-    if (bin_result < 0) {
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("Erro ao associar o socket\n");
         close(server_fd);
         exit(EXIT_FAILURE);
@@ -101,9 +96,8 @@ int main() {
         perror("Erro ao aceitar conexão\n");
         close(server_fd);
         exit(EXIT_FAILURE);
-    }
-    else{  
-        printf("Cliente Conectado\n");
+    } else {  
+        printf("Cliente conectado\n");
     }
 
     memset(buffer, 0, BUFFER_SIZE); 
@@ -116,7 +110,7 @@ int main() {
         send_file(client_socket);
     } else {
         send(client_socket, "ERROR", 5, 0);
-        printf("Mensagem incorreta enviada ao cliente.\n");
+        printf("Mensagem incorreta enviada pelo cliente.\n");
     }
 
     close(client_socket);
@@ -125,3 +119,4 @@ int main() {
 
     return 0;
 }
+
