@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 4 * 1024
 #define FILE_NAME "arquivo"
 
 void send_file(int client_socket) {

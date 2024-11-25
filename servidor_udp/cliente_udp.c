@@ -7,11 +7,10 @@
 
 #define OUTPUT "arquivo_transferido"
 #define PORT 8081
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 4 * 1024
 
 int main(int argc, char *argv[])
 {
-    clock_t temp_ini = clock();
     printf("\nIniciando cliente UDP...\n");
 
     int socketUdp = socket(AF_INET, SOCK_DGRAM, 0);
@@ -23,6 +22,8 @@ int main(int argc, char *argv[])
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     server_addr.sin_port = htons(PORT);
+
+    clock_t temp_ini = clock();
 
     char *mensagem = "Iai cara, me manda o arquivo";
     if (sendto(socketUdp, mensagem, strlen(mensagem), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)

@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 #define PORT 8081
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 4 * 1024
 #define FILENAME "arquivo"
 
 int main()

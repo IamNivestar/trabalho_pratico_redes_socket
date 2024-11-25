@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 4 * 1024
 #define OUTPUT_FILE "arquivo_transferido"
 
 // função para calcular e exibir a taxa de download
@@ -90,7 +90,6 @@ int receive_file(int client_socket, size_t tamanho_esperado, clock_t start_time)
 int main() {
 
     int client_socket;
-    clock_t start_time = clock();
     
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE];
@@ -120,6 +119,8 @@ int main() {
     // fgets(buffer, BUFFER_SIZE, stdin);
     strcpy(buffer, "send me the file");
     buffer[strcspn(buffer, "\n")] = 0;  // Remove o \n
+
+    clock_t start_time = clock();
 
     send(client_socket, buffer, strlen(buffer), 0);
 

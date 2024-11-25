@@ -19,7 +19,7 @@ plt.plot(indice, pacotes_perd_udp, marker='o', label="UDP")
 plt.xlabel('Teste')
 plt.ylabel('Número de Pacotes')
 plt.legend()
-plt.ylim(0, max(pacotes_perd_udp) + 10)
+plt.ylim(0, max(pacotes_perd_udp) + 50)
 plt.title('Pacotes Perdidos')
 plt.show()
 
